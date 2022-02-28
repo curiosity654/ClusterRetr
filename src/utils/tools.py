@@ -68,7 +68,7 @@ def eval_AP_inner(inst_id, scores, gt_labels, top=None):
     tot = scores.shape[0]
     tot_pos = np.sum(pos_flag)
 
-    sort_idx = np.argsort(-scores)
+    sort_idx = np.argsort(scores)
     tp = pos_flag[sort_idx]
     fp = np.logical_not(tp)
 
@@ -111,7 +111,7 @@ def eval_precision(inst_id, scores, gt_labels, top=100):
 
     top = min(top, tot)
 
-    sort_idx = np.argsort(-scores)
+    sort_idx = np.argsort(scores)
     return np.sum(pos_flag[sort_idx][:top]) / top
 
 def accuracy(output, target, topk=(1,)):
