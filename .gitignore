@@ -1,0 +1,8 @@
+*.npy
+*.txt
+*.pickle
+*.pyc
+
+dataset
+**/wandb/**
+checkpoints
