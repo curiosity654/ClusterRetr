@@ -99,17 +99,17 @@ def main():
     if args.zero_version == 'zeroshot2':
         args.num_classes = 104
 
-    feature_file = os.path.join(savedir, 'features_zero.pickle')
+    feature_file = os.path.join(savedir, 'features_baseline_tuberlin.pickle')
     if os.path.isfile(feature_file):
         print('load saved SBIR features')
         with open(feature_file, 'rb') as fh:
             predicted_features_gallery, binary_features_gallery, gt_labels_gallery, \
             predicted_features_query, binary_features_query, gt_labels_query, \
             scores, binary_scores = pickle.load(fh)
-
+        scores, binary_scores = -scores, -binary_scores
         if scores is None:
-            scores = - cdist(predicted_features_query, predicted_features_gallery)
-            binary_scores = - cdist(binary_features_query, binary_features_gallery)
+            scores = cdist(predicted_features_query, predicted_features_gallery)
+            binary_scores = cdist(binary_features_query, binary_features_gallery)
 
     else:
         print('prepare SBIR features using saved model')
@@ -222,7 +222,7 @@ def prepare_features():
         print("=> no checkpoint found at '{}'".format(resume))
         # return
 
-    cudnn.benchmark = True
+    # cudnn.benchmark = True
 
     # load data
     immean = [0.485, 0.456, 0.406] # RGB channel mean for imagenet
@@ -249,10 +249,10 @@ def prepare_features():
     
     predicted_features_query, gt_labels_query = get_features(zero_loader, model, 0)
     
-    scores = - cdist(predicted_features_query, predicted_features_gallery)
+    scores = cdist(predicted_features_query, predicted_features_gallery)
 
     binary_features_query, binary_features_gallery = compressITQ(predicted_features_query, predicted_features_gallery)
-    binary_scores = - cdist(binary_features_query, binary_features_gallery)
+    binary_scores = cdist(binary_features_query, binary_features_gallery)
     print('euclidean distance calculated')
 
 #     predicted_labels = validate(train_loader_ext, model, criterion)
@@ -313,60 +313,6 @@ def get_features(data_loader, model, tag=1):
     print('Features ready: {}, {}'.format(features_all.shape, targets_all.shape))
     
     return features_all, targets_all
-
-
-        
-def eval_AP_inner(inst_id, scores, gt_labels, top=None):
-    pos_flag = gt_labels == inst_id
-    tot = scores.shape[0]
-    tot_pos = np.sum(pos_flag)
-    
-    sort_idx = np.argsort(-scores)
-    tp = pos_flag[sort_idx]
-    fp = np.logical_not(tp)
-    
-    if top is not None:
-        top = min(top, tot)
-        tp = tp[:top]
-        fp = fp[:top]
-        tot_pos = min(top, tot_pos)
-    
-    fp = np.cumsum(fp)
-    tp = np.cumsum(tp)
-    try:
-        rec = tp / tot_pos
-        prec = tp / (tp + fp)
-    except:
-        print(inst_id, tot_pos)
-        return np.nan
-
-    ap = VOCap(rec, prec)
-    return ap
-
-def VOCap(rec, prec):
-    mrec = np.append(0, rec)
-    mrec = np.append(mrec, 1)
-    
-    mpre = np.append(0, prec)
-    mpre = np.append(mpre, 0)
-    
-    for ii in range(len(mpre)-2,-1,-1):
-        mpre[ii] = max(mpre[ii], mpre[ii+1])
-        
-    msk = [i!=j for i,j in zip(mrec[1:], mrec[0:-1])]
-    ap = np.sum((mrec[1:][msk]-mrec[0:-1][msk])*mpre[1:][msk])
-    return ap
-
-
-def eval_precision(inst_id, scores, gt_labels, top=100):
-    pos_flag = gt_labels == inst_id
-    tot = scores.shape[0]
-    
-    top = min(top, tot)
-    
-    sort_idx = np.argsort(-scores)
-    return np.sum(pos_flag[sort_idx][:top])/top
-
 
 if __name__ == '__main__':
     main()

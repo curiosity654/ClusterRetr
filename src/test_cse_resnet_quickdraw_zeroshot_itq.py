@@ -116,8 +116,8 @@ def main():
         #     scores, binary_scores = pickle.load(fh)
 
         if scores is None:
-            scores = - cdist(predicted_features_query, predicted_features_gallery)
-            binary_scores = - cdist(binary_features_query, binary_features_gallery)
+            scores = cdist(predicted_features_query, predicted_features_gallery)
+            binary_scores = cdist(binary_features_query, binary_features_gallery)
 
     else:
         print('prepare SBIR features using saved model')
@@ -204,7 +204,7 @@ def prepare_features():
         print("=> no checkpoint found at '{}'".format(resume))
         # return
 
-    cudnn.benchmark = True
+    # cudnn.benchmark = True
 
     # load data
     immean = [0.485, 0.456, 0.406] # RGB channel mean for imagenet

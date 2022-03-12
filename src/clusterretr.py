@@ -6,9 +6,9 @@ from utils import nanopq
 from utils.tools import eval_precision, eval_AP_inner, compressITQ
 from scipy.spatial.distance import cdist
 from tqdm import tqdm
-# import wandb
+from time import time
 
-def expriment(X, gt_labels_gallery, predicted_features_query, gt_labels_query, M=1, Ks=256):
+def expriment(X, gt_labels_gallery, predicted_features_query, gt_labels_query, _, M=1, Ks=256):
     pq = nanopq.PQ(M=M, verbose=False, Ks=Ks)
 
     pq.fit(X)
@@ -43,7 +43,7 @@ def expriment(X, gt_labels_gallery, predicted_features_query, gt_labels_query, M
     print("{}, {}, {}, {},".format(M, Ks, mAP_binary, prec_binary))
     return mAP_binary, prec_binary
 
-def itq_expriment(X, gt_labels_gallery, predicted_features_query, gt_labels_query, M=1, Ks=256):
+def itq_expriment(X, gt_labels_gallery, predicted_features_query, gt_labels_query, _, M=1, Ks=256,):
     pq = nanopq.PQ(M=M, verbose=False, Ks=Ks)
 
     pq_X = pq.fit(X)
@@ -68,7 +68,7 @@ def itq_expriment(X, gt_labels_gallery, predicted_features_query, gt_labels_quer
     print("{}, {}, {}, {},".format(M, Ks, mAP_binary, prec_binary))
     return mAP_binary, prec_binary
 
-def reranking_expriment(X, gt_labels_gallery, predicted_features_query, gt_labels_query, scores, M=1, Ks=256):
+def reranking_expriment(X, gt_labels_gallery, predicted_features_query, gt_labels_query, scores, M=1, Ks=256,):
     pq = nanopq.PQ(M=M, verbose=False, Ks=Ks)
 
     pq.fit(X)
@@ -118,37 +118,76 @@ def reranking_expriment(X, gt_labels_gallery, predicted_features_query, gt_label
     print("{}, {}, {}, {},".format(M, Ks, mAP_binary, prec_binary))
     return mAP_binary, prec_binary
 
-def run_experiments(expriment, predicted_features_gallery, gt_labels_gallery, predicted_features_query, gt_labels_query, Ms, Ks):
+def run_experiments(expriment, predicted_features_gallery, gt_labels_gallery, predicted_features_query, gt_labels_query, scores, Ms, Ks,):
     from multiprocessing import Process
     processes = []
     for M in Ms:
         for K in Ks:
-            exp = Process(target=expriment, args=(predicted_features_gallery, gt_labels_gallery, predicted_features_query, gt_labels_query, M, K,))
+            exp = Process(target=expriment, args=(predicted_features_gallery, gt_labels_gallery, predicted_features_query, gt_labels_query, scores, M, K,))
             processes.append(exp)
 
     [p.start() for p in processes]
     [p.join() for p in processes]
+
+def time_real_computation(predicted_features_gallery, predicted_features_query):
+    start = time()
+    dist = cdist(predicted_features_query, predicted_features_gallery)
+    end = time()
+
+    print("computing dist for shape {}, {}, used: {}s".format(predicted_features_query.shape, predicted_features_gallery.shape, end-start))
+    return
+
+def time_pq_computation(predicted_features_gallery, predicted_features_query, M, K):
+    pq = nanopq.PQ(M=M, verbose=False, Ks=K)
+    pq.fit(predicted_features_gallery)
+    X_code = pq.encode(predicted_features_gallery)
+    binary_scores = []
+
+    start = time()
+    for query in predicted_features_query:
+        dists = pq.dtable(query).adist(X_code)
+        binary_scores.append(dists)
+    end = time()
+
+    print("{}, {}, {},".format(M, K, end-start))
+    return
 
 if __name__ =='__main__':
     parser = argparse.ArgumentParser(description='Clustering Retrieval')
     parser.add_argument('--feature_file', '-s',  metavar='DIR', default='checkpoints/features_baseline.pickle')
     parser.add_argument('--itq', action='store_true', default=False)
     parser.add_argument('--rerank', action='store_true', default=False)
+    parser.add_argument('--real', action='store_true', default=False)
+    parser.add_argument('--time', action='store_true', default=False)
 
     args = parser.parse_args()
-    print(args)
     with open(args.feature_file, 'rb') as fh:
         predicted_features_gallery, binary_features_gallery, gt_labels_gallery, \
         predicted_features_query, binary_features_query, gt_labels_query, \
         scores, _ = pickle.load(fh)
+        # predicted_features_gallery, gt_labels_gallery, \
+        # predicted_features_query, gt_labels_query, _ = pickle.load(fh)
+        # print(predicted_features_gallery.shape)
+        # scores = cdist(predicted_features_query, predicted_features_gallery)
 
+    # Ms = [1, 2, 4, 8, 16]
+    # Ks = [8, 16, 25, 32, 64, 128, 256]
     Ms = [1, 2, 4, 8, 16]
-    Ks = [8, 16, 25, 32, 64, 128, 256]
-    print("M, K, mAP, Prec,")
-    if args.itq:
-        run_experiments(itq_expriment, predicted_features_gallery, gt_labels_gallery, predicted_features_query, gt_labels_query, Ms, Ks)
-    elif args.rerank:
-        run_experiments(reranking_expriment, predicted_features_gallery, gt_labels_gallery, predicted_features_query, gt_labels_query, Ms, Ks)
+    Ks = [32]
+    # Ks = [8, 16, 32]
+    if args.time:
+        print("M, K, Time,")
+        for M in Ms:
+            for K in Ks:
+                time_pq_computation(predicted_features_gallery, predicted_features_query, M, K)    
     else:
-        run_experiments(expriment, predicted_features_gallery, gt_labels_gallery, predicted_features_query, gt_labels_query, Ms, Ks)
+        print("M, K, mAP, Prec,")
+    if args.itq:
+        run_experiments(itq_expriment, predicted_features_gallery, gt_labels_gallery, predicted_features_query, gt_labels_query, scores, Ms, Ks)
+    elif args.rerank:
+        run_experiments(reranking_expriment, predicted_features_gallery, gt_labels_gallery, predicted_features_query, gt_labels_query, scores, Ms, Ks)
+    elif args.real:
+        time_real_computation(predicted_features_gallery, predicted_features_query)
+    else:
+        run_experiments(expriment, predicted_features_gallery, gt_labels_gallery, predicted_features_query, gt_labels_query, scores, Ms, Ks)
     # expriment(predicted_features_gallery, gt_labels_gallery, predicted_features_query, gt_labels_query, 1, 256)

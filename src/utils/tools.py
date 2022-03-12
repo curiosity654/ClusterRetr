@@ -63,21 +63,22 @@ def compressITQ(Xtrain, Xtest, n_iter=50):
 
     return Ctrain, Ctest
 
-def eval_AP_inner(inst_id, scores, gt_labels, top=None):
+def eval_AP_inner(inst_id, scores, gt_labels, top=None, sort_idx=None):
     pos_flag = gt_labels == inst_id
     tot = scores.shape[0]
     tot_pos = np.sum(pos_flag)
-
-    sort_idx = np.argsort(scores)
+    
+    if sort_idx is None:
+        sort_idx = np.argsort(scores)
     tp = pos_flag[sort_idx]
     fp = np.logical_not(tp)
-
+    
     if top is not None:
         top = min(top, tot)
         tp = tp[:top]
         fp = fp[:top]
         tot_pos = min(top, tot_pos)
-
+    
     fp = np.cumsum(fp)
     tp = np.cumsum(tp)
     try:
@@ -89,7 +90,6 @@ def eval_AP_inner(inst_id, scores, gt_labels, top=None):
 
     ap = VOCap(rec, prec)
     return ap
-
 
 def VOCap(rec, prec):
     mrec = np.append(0, rec)
@@ -105,14 +105,14 @@ def VOCap(rec, prec):
     ap = np.sum((mrec[1:][msk] - mrec[0:-1][msk]) * mpre[1:][msk])
     return ap
 
-def eval_precision(inst_id, scores, gt_labels, top=100):
+def eval_precision(inst_id, scores, gt_labels, top=100, sort_idx=None):
     pos_flag = gt_labels == inst_id
     tot = scores.shape[0]
-
+    
     top = min(top, tot)
-
-    sort_idx = np.argsort(scores)
-    return np.sum(pos_flag[sort_idx][:top]) / top
+    if sort_idx is None:
+        sort_idx = np.argsort(scores)
+    return np.sum(pos_flag[sort_idx][:top])/top
 
 def accuracy(output, target, topk=(1,)):
     """Computes the accuracy over the k top predictions for the specified values of k"""

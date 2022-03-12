@@ -22,7 +22,7 @@ from utils.larkbot import LarkBot
 import cv2
 
 import wandb
-wandb.init(project="ZSSBIR")
+# wandb.init(project="ZSSBIR")
 
 model_names = sorted(name for name in pretrainedmodels.__dict__
                      if name.islower() and not name.startswith("__"))
@@ -35,7 +35,7 @@ parser.add_argument('--arch', '-a', metavar='ARCH', default='cse_resnet50',
                          ' (default: se_resnet50)')
 parser.add_argument('--num_classes', metavar='N', type=int, default=100,
                     help='number of classes (default: 100)')
-parser.add_argument('--num_hashing', metavar='N', type=int, default=64,
+parser.add_argument('--num_hashing', metavar='N', type=int, default=512,
                     help='number of hashing dimension (default: 64)')
 parser.add_argument('--batch_size', default=15, type=int, metavar='N',
                     help='number of samples per batch')
@@ -43,14 +43,14 @@ parser.add_argument('--print-freq', '-p', default=20, type=int,
                     metavar='N', help='print frequency (default: 20)')
 
 parser.add_argument('--resume_dir',
-                    default='../cse_resnet50/checkpoint',
+                    default='./checkpoints/SAKE_KLD0.1/512/random_5736',
                     type=str, metavar='PATH',
                     help='dir of model checkpoint (default: none)')
 parser.add_argument('--resume_file',
                     default='model_best.pth.tar',
                     type=str, metavar='PATH',
                     help='file name of model checkpoint (default: none)')
-
+parser.add_argument('--feature_file', default=None, type=str)
 parser.add_argument('--ems-loss', dest='ems_loss', action='store_true',
                     help='use ems loss for the training')
 parser.add_argument('--precision', action='store_true', help='report precision@100')
@@ -82,7 +82,7 @@ def main():
     args.precision = True
     WEBHOOK_URL = "https://open.feishu.cn/open-apis/bot/v2/hook/03fdc834-de4b-41a9-8d15-7c8410d44915"
     bot = LarkBot(url=WEBHOOK_URL)
-    wandb.config.update(args)
+    # wandb.config.update(args)
 
     global savedir
 
@@ -102,17 +102,17 @@ def main():
         for line in f:
             cid2label.append(line.split()[0])
         
-    feature_file = os.path.join(savedir, 'features_zero.pickle')
+    feature_file = args.feature_file
     if os.path.isfile(feature_file):
         print('load saved SBIR features')
         with open(feature_file, 'rb') as fh:
             predicted_features_gallery, binary_features_gallery, gt_labels_gallery, \
             predicted_features_query, binary_features_query, gt_labels_query, \
             scores, binary_scores = pickle.load(fh)
-
+            
         if scores is None:
-            scores = - cdist(predicted_features_query, predicted_features_gallery)
-            binary_scores = - cdist(binary_features_query, binary_features_gallery)
+            scores = cdist(predicted_features_query, predicted_features_gallery)
+            binary_scores = cdist(binary_features_query, binary_features_gallery)
 
     else:
         print('prepare SBIR features using saved model')
@@ -135,8 +135,8 @@ def main():
     mAP = np.array([np.nanmean(maps) for maps in mAP_ls]).mean()
     mAP_binary = np.array([np.nanmean(maps) for maps in mAP_ls_binary]).mean()
     print('mAP - real value: {:.4f}, hash: {:.4f}'.format(mAP, mAP_binary))
-    wandb.log({"test/sketchy/mAP/all": mAP})
-    wandb.log({"test/sketchy/mAP/all_binary": mAP_binary})
+    # wandb.log({"test/sketchy/mAP/all": mAP})
+    # wandb.log({"test/sketchy/mAP/all_binary": mAP_binary})
 
     if args.precision:
         prec_ls = [[] for _ in range(len(np.unique(gt_labels_query)))]
@@ -151,8 +151,8 @@ def main():
         prec = np.array([np.nanmean(pre) for pre in prec_ls]).mean()
         prec_binary = np.array([np.nanmean(pre) for pre in prec_ls_binary]).mean()
         print('Precision - real value: {:.4f}, hash: {:.4f}'.format(prec, prec_binary))
-        wandb.log({"test/sketchy/precision/all": prec})
-        wandb.log({"test/sketchy/precision/all_binary": prec_binary})
+        # wandb.log({"test/sketchy/precision/all": prec})
+        # wandb.log({"test/sketchy/precision/all_binary": prec_binary})
         
     bot.send(content="{} test complete".format(args.resume_dir))
     ################ PBIR
@@ -262,7 +262,7 @@ def prepare_features():
         print("=> no checkpoint found at '{}'".format(resume))
         # return
 
-    cudnn.benchmark = True
+    # cudnn.benchmark = True
 
     # load data
     immean = [0.485, 0.456, 0.406] # RGB channel mean for imagenet
@@ -289,10 +289,10 @@ def prepare_features():
     
     predicted_features_query, gt_labels_query = get_features(zero_loader, model, 0)
     
-    scores = - cdist(predicted_features_query, predicted_features_gallery)
+    scores = cdist(predicted_features_query, predicted_features_gallery)
 
     binary_features_query, binary_features_gallery = compressITQ(predicted_features_query, predicted_features_gallery)
-    binary_scores = - cdist(binary_features_query, binary_features_gallery)
+    binary_scores = cdist(binary_features_query, binary_features_gallery)
     print('euclidean distance calculated')
         
     

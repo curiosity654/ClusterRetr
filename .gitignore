@@ -2,6 +2,8 @@
 *.txt
 *.pickle
 *.pyc
+*.pdf
+*.png
 
 dataset
 **/wandb/**
