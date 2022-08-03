@@ -111,6 +111,41 @@ def cpq_expriment(X, gt_labels_gallery, predicted_features_query, gt_labels_quer
     print("{}, {}, {}, {},".format(M, Ks, mAP_binary, prec_binary))
     return mAP_binary, prec_binary
 
+def rpq_expriment(X, gt_labels_gallery, predicted_features_query, gt_labels_query, _, M=1, Ks=256, **args):
+    pq = nanopq.RPQ(M=M, verbose=False, Ks=Ks)
+
+    pq.fit(X)
+
+    X_code = pq.encode(X)
+    binary_scores = []
+    for query in predicted_features_query:
+        dists = pq.dtable(query).adist(X_code)
+        binary_scores.append(dists)
+
+    binary_scores = np.stack(binary_scores)
+
+    mAP_ls_binary = [[] for _ in range(len(np.unique(gt_labels_query)))]
+    for fi in range(predicted_features_query.shape[0]):
+        mapi_binary = eval_AP_inner(gt_labels_query[fi], binary_scores[fi], gt_labels_gallery)
+        mAP_ls_binary[gt_labels_query[fi]].append(mapi_binary)
+    
+    # for mAPi,mAPs in enumerate(mAP_ls):
+    #     print(str(mAPi)+' '+str(np.nanmean(mAPs))+' '+str(np.nanstd(mAPs)))
+    mAP_binary = np.array([np.nanmean(maps) for maps in mAP_ls_binary]).mean()
+    # print('mAP - hash: {:.4f}'.format(mAP_binary))
+    # wandb.log({"test/sketchy/mAP/all_binary": mAP_binary})
+
+    prec_ls_binary = [[] for _ in range(len(np.unique(gt_labels_query)))]
+    for fi in range(predicted_features_query.shape[0]):
+        prec_binary = eval_precision(gt_labels_query[fi], binary_scores[fi], gt_labels_gallery)
+        prec_ls_binary[gt_labels_query[fi]].append(prec_binary)
+
+    prec_binary = np.array([np.nanmean(pre) for pre in prec_ls_binary]).mean()
+    # print('Precision - hash: {:.4f}'.format(prec_binary))
+    # wandb.log({"test/sketchy/precision/all_binary": prec_binary})
+    print("{}, {}, {}, {},".format(M, Ks, mAP_binary, prec_binary))
+    return mAP_binary, prec_binary
+
 def fuse_expriment(X, gt_labels_gallery, predicted_features_query, gt_labels_query, _, M=1, Ks=256, lam=0.2):
     pq = nanopq.PQ(M=M, verbose=False, Ks=Ks)
 
@@ -256,12 +291,15 @@ def reranking_expriment(X, gt_labels_gallery, predicted_features_query, gt_label
     print("{}, {}, {}, {},".format(M, Ks, mAP_binary, prec_binary))
     return mAP_binary, prec_binary
 
-def run_experiments(expriment, predicted_features_gallery, gt_labels_gallery, predicted_features_query, gt_labels_query, scores, Ms, Ks, lam):
+def run_experiments(expriment, predicted_features_gallery, gt_labels_gallery, predicted_features_query, gt_labels_query, scores, Ms, Ks, lam=None):
     from multiprocessing import Process
     processes = []
     for M in Ms:
         for K in Ks:
-            exp = Process(target=expriment, args=(predicted_features_gallery, gt_labels_gallery, predicted_features_query, gt_labels_query, scores, M, K, lam))
+            if lam is None:
+                exp = Process(target=expriment, args=(predicted_features_gallery, gt_labels_gallery, predicted_features_query, gt_labels_query, scores, M, K))
+            else:
+                exp = Process(target=expriment, args=(predicted_features_gallery, gt_labels_gallery, predicted_features_query, gt_labels_query, scores, M, K, lam))
             processes.append(exp)
 
     [p.start() for p in processes]
@@ -299,6 +337,8 @@ if __name__ =='__main__':
     parser.add_argument('--fcm', action='store_true', default=False)
     parser.add_argument('--fuse', type=float, default=-1)
     parser.add_argument('--cpq', action='store_true', default=False)
+    parser.add_argument('--rpq', action='store_true', default=False)
+    parser.add_argument('--extend', action='store_true', default=False)
     parser.add_argument('--sym', action='store_true', default=False)
     parser.add_argument('--time', action='store_true', default=False)
     parser.add_argument('--debug', action='store_true', default=False)
@@ -315,8 +355,8 @@ if __name__ =='__main__':
 
     Ks = [8, 16, 25, 32, 64, 128, 256]
     Ms = [1, 2, 4, 8, 16]
-    # Ms = [1]
-    # Ks = [32]
+    # Ms = [2]
+    # Ks = [5]
     # Ks = [30]
     # Ks = [8, 16, 32]
     if args.time:
@@ -329,6 +369,14 @@ if __name__ =='__main__':
                     time_pq_computation(predicted_features_gallery, predicted_features_query, M, K)
     else:
         print("M, K, mAP, Prec,")
+
+    if args.extend:
+        seed = 123
+        np.random.seed(seed)
+        org_channels = np.arange(predicted_features_gallery.shape[1])
+        shuffle_channels = np.random.permutation(org_channels)
+        predicted_features_gallery = predicted_features_gallery[:, np.concatenate([org_channels, shuffle_channels])]
+        predicted_features_query = predicted_features_query[:, np.concatenate([org_channels, shuffle_channels])]
     if args.itq:
         run_experiments(itq_expriment, predicted_features_gallery, gt_labels_gallery, predicted_features_query, gt_labels_query, scores, Ms, Ks)
     elif args.rerank:
@@ -339,10 +387,13 @@ if __name__ =='__main__':
         run_experiments(fuse_expriment, predicted_features_gallery, gt_labels_gallery, predicted_features_query, gt_labels_query, scores, Ms, Ks, lam=0.5)
     elif args.cpq:
         run_experiments(cpq_expriment, predicted_features_gallery, gt_labels_gallery, predicted_features_query, gt_labels_query, scores, Ms, Ks)
+    elif args.rpq:
+        run_experiments(rpq_expriment, predicted_features_gallery, gt_labels_gallery, predicted_features_query, gt_labels_query, scores, Ms, Ks)
     elif args.sym:
         run_experiments(sym_expriment, predicted_features_gallery, gt_labels_gallery, predicted_features_query, gt_labels_query, scores, Ms, Ks)
     elif args.debug:
-        cpq_expriment(predicted_features_gallery, gt_labels_gallery, predicted_features_query, gt_labels_query, scores, 4, 32)
+        rpq_expriment(predicted_features_gallery, gt_labels_gallery, predicted_features_query, gt_labels_query, scores, 4, 32)
+        # cpq_expriment(predicted_features_gallery, gt_labels_gallery, predicted_features_query, gt_labels_query, scores, 4, 32)
         # fuse_expriment(predicted_features_gallery, gt_labels_gallery, predicted_features_query, gt_labels_query, scores, 1, 32, 0.2)
         # fkmeans_expriment(predicted_features_gallery, gt_labels_gallery, predicted_features_query, gt_labels_query, scores, 1, 32)
         # expriment(predicted_features_gallery, gt_labels_gallery, predicted_features_query, gt_labels_query, 1, 256)
