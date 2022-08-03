@@ -103,7 +103,7 @@ def main():
             cid2label.append(line.split()[0])
         
     feature_file = args.feature_file
-    if os.path.isfile(feature_file):
+    if feature_file is not None and os.path.isfile(feature_file):
         print('load saved SBIR features')
         with open(feature_file, 'rb') as fh:
             predicted_features_gallery, binary_features_gallery, gt_labels_gallery, \
