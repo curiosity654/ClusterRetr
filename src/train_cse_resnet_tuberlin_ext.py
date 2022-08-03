@@ -196,7 +196,7 @@ def train(train_loader, train_loader_ext, model, criterion, criterion_kd, \
             
         loss = criterion(output, target_all)
         loss_kd = criterion_kd(output_kd, output_t * args.kd_lambda, tag_all, cid_mask_all * args.kdneg_lambda)
-        loss_kld = 0
+        loss_kld = torch.Tensor([0]).cuda()
         kld_lambda = 0
         if args.kld_lambda > 0:
             zn = Variable(torch.cuda.FloatTensor(np.random.normal(0,1, (len(input_all), output_feat.size(-1)))))
