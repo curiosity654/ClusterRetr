@@ -19,7 +19,6 @@ import pretrainedmodels
 import torch.nn.functional as F
 from models.ResnetModel import CSEResnetModel_KDHashing
 from utils.tools import eval_precision, eval_AP_inner, compressITQ
-from utils.larkbot import LarkBot
 warnings.filterwarnings("error")
 
 import wandb
@@ -82,8 +81,6 @@ def main():
     global args
     args = parser.parse_args()
     args.precision = True
-    WEBHOOK_URL = "https://open.feishu.cn/open-apis/bot/v2/hook/03fdc834-de4b-41a9-8d15-7c8410d44915"
-    bot = LarkBot(url=WEBHOOK_URL)
     wandb.config.update(args)
 
     global savedir
@@ -149,35 +146,6 @@ def main():
         print('Precision - real value: {:.4f}, hash: {:.4f}'.format(prec, prec_binary))
         wandb.log({"test/tuberlin/precision/all": prec})
         wandb.log({"test/tuberlin/precision/all_binary": prec_binary})
-    
-    bot.send(content="{} test complete".format(args.resume_dir))
-    
-# def prepare_pbir_features(predicted_features_ext, gt_labels_ext):
-#     query_index = []
-#     for ll in np.unique(gt_labels_ext):
-#         query_index.append(np.where(gt_labels_ext==ll)[0][0:10])
-        
-#     query_index = np.concatenate(query_index)
-    
-#     query_index_bool = np.zeros(gt_labels_ext.shape[0]).astype(bool)
-#     query_index_bool[query_index] = True
-    
-#     predicted_features_query = predicted_features_ext[query_index_bool]
-#     gt_labels_query = gt_labels_ext[query_index_bool]
-#     predicted_features_gallery = predicted_features_ext[np.logical_not(query_index_bool)]
-#     gt_labels_gallery = gt_labels_ext[np.logical_not(query_index_bool)]
-    
-    
-#     scores = - cdist(predicted_features_query, predicted_features_gallery)
-#     print('euclidean distance calculated')
-
-#     with open(os.path.join(args.resume_dir, 'features_photo.pickle'),'wb') as fh:
-#         pickle.dump([predicted_features_gallery, gt_labels_gallery, \
-#                     predicted_features_query, gt_labels_query, \
-#                     None],fh)
-        
-#     return predicted_features_gallery, gt_labels_gallery, predicted_features_query, gt_labels_query, scores
-    
     
 def prepare_features():
     # create model

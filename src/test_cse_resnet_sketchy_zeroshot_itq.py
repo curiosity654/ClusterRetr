@@ -17,7 +17,6 @@ import pretrainedmodels
 import torch.nn.functional as F
 from models.ResnetModel import CSEResnetModel_KDHashing
 from utils.tools import eval_precision, eval_AP_inner, compressITQ
-from utils.larkbot import LarkBot
 # warnings.filterwarnings("error")
 import cv2
 
@@ -80,9 +79,6 @@ def main():
     global args
     args = parser.parse_args()
     args.precision = True
-    WEBHOOK_URL = "https://open.feishu.cn/open-apis/bot/v2/hook/03fdc834-de4b-41a9-8d15-7c8410d44915"
-    bot = LarkBot(url=WEBHOOK_URL)
-    # wandb.config.update(args)
 
     global savedir
 
@@ -154,7 +150,6 @@ def main():
         # wandb.log({"test/sketchy/precision/all": prec})
         # wandb.log({"test/sketchy/precision/all_binary": prec_binary})
         
-    bot.send(content="{} test complete".format(args.resume_dir))
     ################ PBIR
         
     # feature_file = os.path.join(args.resume_dir, 'features_photo.pickle')

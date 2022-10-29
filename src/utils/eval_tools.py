@@ -1,7 +1,3 @@
-import torch
-import torch.backends.cudnn as cudnn
-import torch.nn as nn
-import torch.nn.functional as F
 import numpy as np
 from scipy.spatial.distance import cdist
 import math
@@ -130,46 +126,3 @@ def accuracy(output, target, topk=(1,)):
         correct_k = correct[:k].reshape(-1).float().sum(0, keepdim=True)
         res.append(correct_k.mul_(100.0 / batch_size))
     return res
-
-class AverageMeter(object):
-    """Computes and stores the average and current value"""
-
-    def __init__(self):
-        self.reset()
-
-    def reset(self):
-        self.val = 0
-        self.avg = 0
-        self.sum = 0
-        self.count = 0
-
-    def update(self, val, n=1):
-        self.val = val
-        self.sum += val * n
-        self.count += n
-        self.avg = self.sum / self.count
-
-class SoftCrossEntropy(nn.Module):
-    def __init__(self):
-        super(SoftCrossEntropy, self).__init__()
-        return
-
-    def forward(self, input_logits, target_logits, mask=None, mask_pos=None):
-        """
-        :param input_logits: prediction logits
-        :param target_logits: target logits
-        :return: loss
-        """
-        log_likelihood = - F.log_softmax(input_logits, dim=1)
-        
-        if mask_pos is not None:
-            target_logits = target_logits + mask_pos
-        
-        if mask is None:
-            sample_num, class_num = target_logits.shape
-            loss = torch.sum(torch.mul(log_likelihood, F.softmax(target_logits, dim=1)))/sample_num
-        else:
-            sample_num = torch.sum(mask)
-            loss = torch.sum(torch.mul(torch.mul(log_likelihood, F.softmax(target_logits, dim=1)), mask))/sample_num
-
-        return loss
