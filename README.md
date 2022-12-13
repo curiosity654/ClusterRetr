@@ -5,7 +5,7 @@
 
 # Code Usage
 
-1. Calculate and save scores.
+1. (In the repo root dir) Calculate and save scores.
     ```
     python src/pre_process.py
     ```
